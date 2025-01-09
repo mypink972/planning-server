@@ -9,12 +9,107 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
+// Afficher la configuration au démarrage
+console.log('=== Configuration du serveur ===');
+console.log('NODE_ENV:', process.env.NODE_ENV);
 console.log('SMTP Configuration:', {
   host: process.env.SMTP_HOST,
   port: process.env.SMTP_PORT,
   secure: process.env.SMTP_SECURE === 'true',
   user: process.env.SMTP_USER,
-  // Ne pas logger le mot de passe pour des raisons de sécurité
+  tls: {
+    rejectUnauthorized: process.env.NODE_ENV === 'production'
+  }
+});
+
+// Route de test simple
+app.get('/', (req, res) => {
+  res.json({ 
+    status: 'Server is running',
+    environment: process.env.NODE_ENV,
+    smtp: {
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
+      secure: process.env.SMTP_SECURE === 'true',
+      user: process.env.SMTP_USER
+    }
+  });
+});
+
+// Route de test email
+app.get('/test-email', async (req, res) => {
+  console.log('=== Test de la configuration email ===');
+  try {
+    // Créer le transporteur avec logging
+    console.log('Création du transporteur avec:', {
+      host: process.env.SMTP_HOST,
+      port: process.env.SMTP_PORT,
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        // Ne pas logger le mot de passe
+      }
+    });
+
+    const testTransporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || '587'),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      },
+      tls: {
+        rejectUnauthorized: false // Désactiver temporairement pour le test
+      }
+    });
+
+    console.log('Vérification de la configuration SMTP...');
+    await testTransporter.verify();
+    console.log('Configuration SMTP validée');
+
+    console.log('Envoi de l\'email de test...');
+    const mailOptions = {
+      from: process.env.SMTP_USER,
+      to: process.env.SMTP_USER,
+      subject: 'Test de configuration email',
+      text: 'Si vous recevez cet email, la configuration SMTP fonctionne correctement.'
+    };
+
+    const info = await testTransporter.sendMail(mailOptions);
+    console.log('Email envoyé avec succès:', info.messageId);
+
+    res.json({ 
+      success: true, 
+      message: 'Email de test envoyé avec succès',
+      messageId: info.messageId,
+      config: {
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        secure: process.env.SMTP_SECURE === 'true',
+        user: process.env.SMTP_USER
+      }
+    });
+  } catch (error) {
+    console.error('Erreur détaillée lors du test email:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: {
+        message: error.message,
+        code: error.code,
+        command: error.command
+      },
+      config: {
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        secure: process.env.SMTP_SECURE === 'true',
+        user: process.env.SMTP_USER,
+        tls: {
+          rejectUnauthorized: false
+        }
+      }
+    });
+  }
 });
 
 const transporter = nodemailer.createTransport({
@@ -102,35 +197,6 @@ app.post('/send-planning', async (req, res) => {
   } catch (error) {
     console.error('Erreur détaillée lors de l\'envoi des emails:', error);
     res.status(500).json({ error: error.message });
-  }
-});
-
-// Route de test pour vérifier que le serveur fonctionne
-app.get('/test-email', async (req, res) => {
-  try {
-    console.log('Test de la configuration email');
-    
-    const mailOptions = {
-      from: process.env.SMTP_USER,
-      to: process.env.SMTP_USER, // On envoie à la même adresse pour tester
-      subject: 'Test de configuration email',
-      text: 'Si vous recevez cet email, la configuration SMTP fonctionne correctement.'
-    };
-
-    await transporter.sendMail(mailOptions);
-    res.json({ success: true, message: 'Email de test envoyé avec succès' });
-  } catch (error) {
-    console.error('Erreur lors du test email:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message,
-      config: {
-        host: process.env.SMTP_HOST,
-        port: process.env.SMTP_PORT,
-        secure: process.env.SMTP_SECURE === 'true',
-        user: process.env.SMTP_USER
-      }
-    });
   }
 });
 
