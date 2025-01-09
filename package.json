@@ -1,0 +1,16 @@
+{
+  "name": "planning-server",
+  "version": "1.0.0",
+  "description": "Server for planning application",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.18.2",
+    "nodemailer": "^6.9.7"
+  }
+}
