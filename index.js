@@ -9,6 +9,14 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
+console.log('SMTP Configuration:', {
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  secure: process.env.SMTP_SECURE === 'true',
+  user: process.env.SMTP_USER,
+  // Ne pas logger le mot de passe pour des raisons de sécurité
+});
+
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'mail.zitata.tv',
   port: parseInt(process.env.SMTP_PORT || '587'),
@@ -25,7 +33,7 @@ const transporter = nodemailer.createTransport({
 // Vérifier la configuration SMTP
 transporter.verify(function(error, success) {
   if (error) {
-    console.error('Erreur de configuration SMTP:', error);
+    console.error('Erreur de configuration SMTP détaillée:', error);
   } else {
     console.log('Serveur SMTP prêt');
   }
@@ -36,6 +44,16 @@ app.post('/send-planning', async (req, res) => {
   const { pdfBuffer, employees, weekStartDate } = req.body;
   
   try {
+    console.log('Données reçues:', {
+      pdfBufferLength: pdfBuffer?.length,
+      employeesCount: employees?.length,
+      weekStartDate: weekStartDate
+    });
+
+    if (!pdfBuffer || !employees || !weekStartDate) {
+      throw new Error('Données manquantes dans la requête');
+    }
+
     console.log('Nombre d\'employés reçus:', employees.length);
     console.log('Employés avec email:', employees.filter(e => e.email).length);
     
@@ -58,7 +76,7 @@ app.post('/send-planning', async (req, res) => {
         console.log('Tentative d\'envoi à:', employee.email);
         
         const mailOptions = {
-          from: 'technique@zitata.tv',
+          from: process.env.SMTP_USER || 'technique@zitata.tv',
           to: employee.email,
           subject: `Planning du ${startDateStr} au ${endDateStr}`,
           text: `Bonjour ${employee.name},\n\nVeuillez trouver ci-joint votre planning pour la semaine du ${startDateStr} au ${endDateStr}.\n\nCordialement,`,
