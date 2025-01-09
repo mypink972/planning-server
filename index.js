@@ -105,6 +105,35 @@ app.post('/send-planning', async (req, res) => {
   }
 });
 
+// Route de test pour vérifier que le serveur fonctionne
+app.get('/test-email', async (req, res) => {
+  try {
+    console.log('Test de la configuration email');
+    
+    const mailOptions = {
+      from: process.env.SMTP_USER,
+      to: process.env.SMTP_USER, // On envoie à la même adresse pour tester
+      subject: 'Test de configuration email',
+      text: 'Si vous recevez cet email, la configuration SMTP fonctionne correctement.'
+    };
+
+    await transporter.sendMail(mailOptions);
+    res.json({ success: true, message: 'Email de test envoyé avec succès' });
+  } catch (error) {
+    console.error('Erreur lors du test email:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message,
+      config: {
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        secure: process.env.SMTP_SECURE === 'true',
+        user: process.env.SMTP_USER
+      }
+    });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
