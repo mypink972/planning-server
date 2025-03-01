@@ -70,21 +70,48 @@ app.get('/test-email', async (req, res) => {
 
 // Route d'envoi de planning
 app.post('/send-planning', async (req, res) => {
-  const { pdfBuffer, employees, weekStartDate } = req.body;
+  const { pdfBuffer, employees, weekStartDate, isMonthly, subject, emailContent, month, year, customEmail } = req.body;
   
   try {
     if (!pdfBuffer || !employees || !weekStartDate) {
       throw new Error('Données manquantes dans la requête');
     }
-
-    const weekStart = new Date(weekStartDate);
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
     
-    const startDateStr = weekStart.toLocaleDateString('fr-FR');
-    const endDateStr = weekEnd.toLocaleDateString('fr-FR');
+    console.log('Type de planning:', isMonthly ? 'Mensuel' : 'Hebdomadaire');
+    console.log('Personnalisation de l\'email:', customEmail ? 'Oui' : 'Non');
+    
+    let emailSubject = '';
+    let emailText = '';
+    let filename = '';
+    
+    // Si c'est un planning mensuel et que nous avons des informations personnalisées
+    if (isMonthly && customEmail && subject && emailContent) {
+      console.log('Utilisation des informations personnalisées pour l\'email');
+      emailSubject = subject;
+      emailText = (employee) => `Bonjour ${employee.name},\n\n${emailContent}\n\nCordialement,`;
+      filename = `planning_mensuel_${month ? month.toLowerCase() : ''}_${year || ''}.pdf`;
+      
+      console.log('Objet personnalisé:', emailSubject);
+      console.log('Nom de fichier personnalisé:', filename);
+    } else {
+      // Format hebdomadaire par défaut
+      const weekStart = new Date(weekStartDate);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      
+      const startDateStr = weekStart.toLocaleDateString('fr-FR');
+      const endDateStr = weekEnd.toLocaleDateString('fr-FR');
+      
+      emailSubject = `Planning du ${startDateStr} au ${endDateStr}`;
+      emailText = (employee) => `Bonjour ${employee.name},\n\nVeuillez trouver ci-joint votre planning pour la semaine du ${startDateStr} au ${endDateStr}.\n\nCordialement,`;
+      filename = `planning_${startDateStr}_${endDateStr}.pdf`;
+      
+      console.log('Période:', startDateStr, 'au', endDateStr);
+      console.log('Objet standard:', emailSubject);
+    }
 
     const pdfData = Buffer.from(pdfBuffer);
+    console.log('Taille du PDF:', pdfData.length, 'octets');
 
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST,
@@ -104,18 +131,22 @@ app.post('/send-planning', async (req, res) => {
         .filter(employee => employee.email)
         .map(async (employee) => {
           try {
+            console.log(`Envoi à ${employee.name} (${employee.email})`);
+            
             const info = await transporter.sendMail({
               from: process.env.SMTP_USER,
               to: employee.email,
-              subject: `Planning du ${startDateStr} au ${endDateStr}`,
-              text: `Bonjour ${employee.name},\n\nVeuillez trouver ci-joint votre planning pour la semaine du ${startDateStr} au ${endDateStr}.\n\nCordialement,`,
+              subject: emailSubject,
+              text: typeof emailText === 'function' ? emailText(employee) : emailText,
               attachments: [{
-                filename: `planning_${startDateStr}_${endDateStr}.pdf`,
+                filename: filename,
                 content: pdfData
               }]
             });
+            console.log(`Email envoyé avec succès à ${employee.email}`);
             return { success: true, employee, messageId: info.messageId };
           } catch (error) {
+            console.error(`Erreur lors de l'envoi à ${employee.email}:`, error.message);
             return { success: false, employee, error: error.message };
           }
         })
