@@ -45,7 +45,7 @@ app.get('/test-email', async (req, res) => {
     });
 
     const mailOptions = {
-      from: process.env.SMTP_USER,
+      from: `"Planning MTZ" <${process.env.SMTP_USER}>`,
       to: process.env.SMTP_USER,
       subject: 'Test de configuration email',
       text: 'Si vous recevez cet email, la configuration SMTP fonctionne correctement.'
@@ -134,7 +134,7 @@ app.post('/send-planning', async (req, res) => {
             console.log(`Envoi à ${employee.name} (${employee.email})`);
             
             const info = await transporter.sendMail({
-              from: process.env.SMTP_USER,
+              from: `"Planning MTZ" <${process.env.SMTP_USER}>`,
               to: employee.email,
               subject: emailSubject,
               text: typeof emailText === 'function' ? emailText(employee) : emailText,
